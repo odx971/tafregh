@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230f766e'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white'%3E%D8%AA%3C/text%3E%3C/svg%3E">
+<title>تفريغ صوتي — تحويل الصوت إلى نص عربي</title>
+<style>
+  :root{
+    --bg:#f1f5f9; --card:#ffffff; --ink:#0f172a; --muted:#64748b;
+    --line:#e2e8f0; --brand:#0f766e; --brand2:#115e59; --accent:#0891b2;
+    --err:#b91c1c; --errbg:#fef2f2; --ok:#166534;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0b1220; --card:#111a2e; --ink:#e2e8f0; --muted:#94a3b8;
+      --line:#1e293b; --brand:#2dd4bf; --brand2:#5eead4; --accent:#22d3ee;
+      --err:#f87171; --errbg:#3a1620; --ok:#4ade80;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Segoe UI",Tahoma,"Noto Kufi Arabic","Noto Naskh Arabic",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.7; padding-bottom:60px;
+  }
+  header{
+    background:linear-gradient(135deg,#0f766e,#0e7490);
+    color:#fff; padding:28px 16px 22px; text-align:center;
+  }
+  header h1{margin:0;font-size:1.5rem;font-weight:800}
+  header p{margin:6px 0 0;opacity:.9;font-size:.9rem}
+  main{max-width:640px;margin:0 auto;padding:16px}
+  section.card{
+    background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:18px; margin-bottom:16px;
+  }
+  section.card h2{
+    margin:0 0 12px; font-size:1.02rem; display:flex; align-items:center; gap:8px;
+  }
+  .num{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:24px; height:24px; border-radius:50%; background:var(--brand);
+    color:#fff; font-size:.8rem; flex:none;
+  }
+  label{font-weight:600; font-size:.9rem; display:block; margin:10px 0 4px}
+  select,input[type=text],input[type=password]{
+    width:100%; padding:12px; border:1px solid var(--line); border-radius:10px;
+    background:var(--bg); color:var(--ink); font-size:1rem; font-family:inherit;
+  }
+  input:focus,select:focus{outline:2px solid var(--brand); border-color:transparent}
+  .row{display:flex; gap:8px; align-items:center}
+  .row .grow{flex:1}
+  button{
+    border:none; border-radius:10px; padding:12px 16px; font-size:.95rem; font-weight:700;
+    cursor:pointer; font-family:inherit; transition:transform .05s ease, filter .15s;
+  }
+  button:active{transform:scale(.97)}
+  button.primary{background:var(--brand); color:#fff; width:100%}
+  button.primary:disabled{opacity:.5; cursor:not-allowed}
+  button.ghost{background:transparent; color:var(--brand2); border:1px solid var(--brand2); padding:8px 12px; font-size:.85rem}
+  button.small{padding:6px 10px; font-size:.8rem}
+  button.outline{background:transparent; color:var(--ink); border:1px solid var(--line); padding:8px 12px; font-size:.85rem}
+  .btnbig{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; padding:16px; border-radius:12px; font-size:1rem;
+    border:2px dashed var(--line); background:transparent; color:var(--ink); cursor:pointer;
+  }
+  .btnbig:hover{border-color:var(--brand); color:var(--brand2)}
+  .btnwrap{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px}
+  .fileinfo{margin-top:10px; padding:10px 12px; border-radius:10px; background:var(--bg); font-size:.85rem; color:var(--muted)}
+  .fileinfo b{color:var(--ink)}
+  .progress{display:none; margin-top:14px}
+  .progress.show{display:block}
+  .bar{height:8px; background:var(--line); border-radius:99px; overflow:hidden}
+  .bar>div{height:100%; width:0%; background:linear-gradient(90deg,var(--brand),var(--accent)); transition:width .3s}
+  #status{margin-top:8px; font-size:.85rem; color:var(--muted)}
+  #status.err{color:var(--err)}
+  #status.ok{color:var(--ok)}
+  .resultbox{
+    white-space:pre-wrap; background:var(--bg); border:1px solid var(--line);
+    border-radius:12px; padding:14px; min-height:120px; max-height:50vh; overflow:auto;
+    font-size:.98rem; line-height:2;
+  }
+  .actions{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
+  .hint{font-size:.78rem; color:var(--muted); margin-top:8px}
+  a{color:var(--accent); word-break:break-all}
+  details{margin-top:6px}
+  details summary{cursor:pointer; font-weight:600; font-size:.9rem; color:var(--brand2)}
+  .help ol{padding-right:20px; margin:8px 0}
+  .help li{margin-bottom:6px; font-size:.9rem}
+  .history-item{border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:10px}
+  .history-item .meta{font-size:.78rem; color:var(--muted); display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap}
+  .history-item .txt{
+    white-space:pre-wrap; max-height:120px; overflow:auto; font-size:.9rem;
+    background:var(--bg); border-radius:8px; padding:8px; margin:8px 0;
+  }
+  footer{text-align:center; font-size:.78rem; color:var(--muted); padding:10px 16px}
+  .note{border-radius:10px; padding:10px 12px; font-size:.85rem; margin-top:10px; background:var(--bg)}
+  .note.warn{background:var(--errbg); color:var(--err)}
+  #customModelWrap{margin-top:4px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>تفريغ صوتي</h1>
+  <p>حوِّل التسجيلات والملاحظات الصوتية إلى نص عربي دقيق — عبر OpenRouter</p>
+</header>
+
+<main>
+
+  <section class="card" id="card-key">
+    <h2><span class="num">1</span> أضف مفتاح OpenRouter</h2>
+    <label for="openrouter_key">مفتاح API</label>
+    <input type="password" id="openrouter_key" placeholder="sk-or-..." autocomplete="off">
+    <div class="row" style="margin-top:8px">
+      <button class="ghost grow" onclick="saveKey()">حفظ المفتاح</button>
+      <button class="outline" onclick="clearKey()">مسح</button>
+    </div>
+    <p class="hint">احصل عليه من <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> — الاستخدام بالرصيد، والمفتاح يُحفظ على جهازك فقط.</p>
+  </section>
+
+  <section class="card" id="card-model">
+    <h2><span class="num">2</span> اختر نموذج التفريغ</h2>
+    <label for="modelSel">النموذج</label>
+    <select id="modelSel">
+      <option value="openai/gpt-4o-transcribe">GPT-4o Transcribe — الأعلى دقة بالعربية</option>
+      <option value="openai/gpt-4o-mini-transcribe">GPT-4o Mini Transcribe — أرخص، دقة جيدة</option>
+      <option value="openai/whisper-large-v3">Whisper Large v3 — ممتاز للعربية</option>
+      <option value="openai/whisper-large-v3-turbo">Whisper Large v3 Turbo — الأسرع</option>
+      <option value="openai/whisper-1">Whisper 1 — الأساسي</option>
+      <option value="custom">نموذج آخر…</option>
+    </select>
+    <div id="customModelWrap" hidden>
+      <label for="customModel">معرّف النموذج</label>
+      <input type="text" id="customModel" placeholder="vendor/model-id">
+    </div>
+    <details>
+      <summary>خيارات متقدمة</summary>
+      <label for="lang">لغة الصوت</label>
+      <select id="lang">
+        <option value="ar">العربية</option>
+        <option value="auto">تلقائي</option>
+      </select>
+    </details>
+  </section>
+
+  <section class="card" id="card-input">
+    <h2><span class="num">3</span> أدخل الصوت</h2>
+    <button class="btnbig" onclick="document.getElementById('fileInput').click()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      رفع ملف صوتي (تسجيل أو ملاحظة واتساب)
+    </button>
+    <input type="file" id="fileInput" accept="audio/*,.opus,.caf,.m4a,.mp3,.wav,.ogg,.webm,.aac,.flac,.mpeg,.mp4,video/*,.m4v" style="display:none">
+    <div class="btnwrap">
+      <button class="ghost" id="recBtn" onclick="toggleRec()">تسجيل بالمايك مباشرة</button>
+      <button class="outline" onclick="resetAll()">إعادة تعيين</button>
+    </div>
+    <div class="fileinfo" id="fileinfo" hidden></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">4</span> التفريغ</h2>
+    <button class="primary" id="runBtn" onclick="runTranscribe()">بدء التفريغ</button>
+    <div class="progress" id="progress">
+      <div class="bar"><div id="barfill"></div></div>
+      <div id="status"></div>
+    </div>
+  </section>
+
+  <section class="card" id="card-result" hidden>
+    <h2><span class="num">5</span> النص الناتج</h2>
+    <div class="resultbox" id="result"></div>
+    <div class="actions">
+      <button class="primary" style="flex:1" onclick="copyResult()">نسخ النص</button>
+      <button class="ghost grow" onclick="downloadResult()">تنزيل .txt</button>
+      <button class="outline" onclick="document.getElementById('result').textContent=''">مسح النص</button>
+    </div>
+  </section>
+
+  <section class="card" id="card-history" hidden>
+    <h2>السجل</h2>
+    <div id="historyList"></div>
+  </section>
+
+  <section class="card help" id="card-help">
+    <h2>المساعدة</h2>
+    <details open>
+      <summary>كيف أحصل على مفتاح OpenRouter؟</summary>
+      <ol>
+        <li>افتح <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> وسجّل الدخول.</li>
+        <li>اضغط "Create Key" وانسخ المفتاح (يبدأ بـ sk-or-).</li>
+        <li>أضف رصيداً من صفحة "Credits" (الشحن بحد أدنى بسيط) ثم الصق المفتاح أعلاه.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>أي نموذج تختار؟</summary>
+      <ol>
+        <li><b>gpt-4o-transcribe</b>: الأدق للعربية والفصحى واللهجات (~0.006$ للدقيقة).</li>
+        <li><b>gpt-4o-mini-transcribe</b>: نصف السعر مع دقة جيدة.</li>
+        <li><b>whisper-large-v3</b>: ممتاز للعربية وغالباً أرخص.</li>
+        <li><b>whisper-large-v3-turbo</b>: الأسرع.</li>
+        <li>يمكنك اختيار "نموذج آخر" وإدخال أي معرّف متاح على OpenRouter.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>كيف أرفع تسجيلاً من "التسجيلات الصوتية" في الأيفون؟</summary>
+      <ol>
+        <li>افتح تطبيق التسجيلات الصوتية → اختر التسجيل → زر المشاركة.</li>
+        <li>اختر "حفظ في الملفات" ثم "حفظ".</li>
+        <li>في التطبيق اضغط "رفع ملف صوتي" واختر الملف.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>كيف أرفع ملاحظة صوتية من واتساب؟</summary>
+      <ol>
+        <li>اضغط مطولاً على الملاحظة الصوتية → "مشاركة" أو "إعادة توجيه".</li>
+        <li>اختر "حفظ في الملفات" (في الأندرويد تظهر في التنزيلات).</li>
+        <li>ارفعه من ملفاتك أو من مجلد WhatsApp الصوتي.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>نصائح لأعلى دقة</summary>
+      <ol>
+        <li>استخدم نموذج gpt-4o-transcribe مع لغة "العربية".</li>
+        <li>سجّل في مكان هادئ وبعيداً عن الضوضاء.</li>
+        <li>الملفات الطويلة تُقسَّم تلقائياً وتُدمج النتائج.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>الخصوصية</summary>
+      <ol>
+        <li>مفتاحك يبقى في متصفحك فقط (localStorage) ويُرسل إلى OpenRouter مباشرة.</li>
+        <li>لا يوجد أي سيرفر وسيط بين جهازك وOpenRouter.</li>
+        <li>احذف مفتاحك من التطبيق إذا كنت تستخدم جهازاً مشتركاً.</li>
+      </ol>
+    </details>
+  </section>
+
+</main>
+
+<footer>
+  الاستخدام بالرصيد عبر OpenRouter — المفتاح يُحفظ محلياً. للاستخدام على الجوال: اضغط "أضف إلى الشاشة الرئيسية".
+</footer>
+
+<script>
+"use strict";
+
+const KEY = "openrouter_key";
+
+const $ = id => document.getElementById(id);
+const modelSel = $("modelSel");
+const customModel = $("customModel");
+const customModelWrap = $("customModelWrap");
+const fileInput = $("fileInput");
+const runBtn = $("runBtn");
+const recBtn = $("recBtn");
+const progress = $("progress");
+const barfill = $("barfill");
+const statusEl = $("status");
+const resultBox = $("result");
+const cardResult = $("card-result");
+const cardHistory = $("card-history");
+const fileinfo = $("fileinfo");
+
+const PRESET_MODELS = [
+  "openai/gpt-4o-transcribe",
+  "openai/gpt-4o-mini-transcribe",
+  "openai/whisper-large-v3",
+  "openai/whisper-large-v3-turbo",
+  "openai/whisper-1"
+];
+
+let currentFile = null;
+
+function getKey(){
+  return (localStorage.getItem(KEY) || "").trim();
+}
+function saveKey(){
+  const inp = $(KEY);
+  const v = inp.value.trim();
+  if(!v){ flash("أدخل المفتاح أولاً"); return; }
+  localStorage.setItem(KEY, v);
+  inp.value = "";
+  inp.placeholder = "✔ تم الحفظ";
+  setTimeout(()=>{ inp.placeholder = "sk-or-..."; }, 2000);
+}
+function clearKey(){
+  localStorage.removeItem(KEY);
+  flash("تم مسح المفتاح");
+}
+
+function loadSettings(){
+  const m = localStorage.getItem("model");
+  if(m){
+    if(PRESET_MODELS.indexOf(m) >= 0){
+      modelSel.value = m;
+    }else{
+      modelSel.value = "custom";
+      customModel.value = m;
+      customModelWrap.hidden = false;
+    }
+  }
+  if(localStorage.getItem("lang")) $("lang").value = localStorage.getItem("lang");
+}
+
+function selectedModel(){
+  if(modelSel.value === "custom") return customModel.value.trim() || "";
+  return modelSel.value;
+}
+
+modelSel.addEventListener("change", e=>{
+  customModelWrap.hidden = e.target.value !== "custom";
+  if(e.target.value !== "custom") localStorage.setItem("model", e.target.value);
+});
+customModel.addEventListener("input", e=>{
+  if(modelSel.value === "custom" && e.target.value.trim()){
+    localStorage.setItem("model", e.target.value.trim());
+  }
+});
+$("lang").addEventListener("change", e=> localStorage.setItem("lang", e.target.value));
+
+fileInput.addEventListener("change", ()=>{
+  const f = fileInput.files && fileInput.files[0];
+  if(f) setFile(f);
+});
+
+function setFile(f){
+  currentFile = f;
+  const kb = (f.size/1024);
+  const size = kb > 1024 ? (kb/1024).toFixed(1)+" MB" : Math.round(kb)+" KB";
+  fileinfo.hidden = false;
+  fileinfo.innerHTML = "<b>"+ escapeHtml(f.name) +"</b> — "+size;
+  if(recBtn.dataset.rec === "1") setRecButton(false);
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function flash(msg){
+  statusEl.textContent = msg;
+  statusEl.className = "";
+  progress.classList.add("show");
+}
+function setStatus(msg, ok){
+  statusEl.textContent = msg;
+  statusEl.className = ok ? "ok" : "";
+  progress.classList.add("show");
+}
+function setProgress(p){
+  barfill.style.width = Math.round(p*100) + "%";
+}
+
+function busy(on){
+  runBtn.disabled = on;
+  recBtn.disabled = on;
+}
+
+function resetAll(){
+  currentFile = null;
+  fileInput.value = "";
+  fileinfo.hidden = true;
+  resultBox.textContent = "";
+  cardResult.hidden = true;
+  statusEl.textContent = "";
+  statusEl.className = "";
+  progress.classList.remove("show");
+  barfill.style.width = "0%";
+}
+
+async function runTranscribe(){
+  if(!currentFile){ flash("اختر ملفاً صوتياً أو سجّل أولاً"); return; }
+  const key = getKey();
+  if(!key){
+    flash("أضف مفتاح OpenRouter أولاً من الخطوة 1");
+    return;
+  }
+  const model = selectedModel();
+  if(!model){
+    flash("حدد النموذج أو أدخل معرّفه في 'نموذج آخر'");
+    customModelWrap.hidden = false;
+    return;
+  }
+  const file = currentFile;
+  busy(true);
+  resetAll();
+  fileinfo.hidden = false;
+  fileinfo.innerHTML = "<b>"+ escapeHtml(file.name) +"</b> — جارٍ التحضير...";
+  try{
+    const result = await transcribeFile(file, model, key);
+    if(!result || !result.trim()) throw new Error("OpenRouter لم يُرجع نصاً. جرّب نموذجاً آخر.");
+    resultBox.textContent = result;
+    cardResult.hidden = false;
+    addHistory(file.name, model, result);
+    setStatus("اكتمل التفريغ ✔", true);
+    fileinfo.innerHTML = "<b>"+ escapeHtml(file.name) +"</b>";
+  }catch(e){
+    setStatus("خطأ: "+e.message);
+  }finally{
+    busy(false);
+  }
+}
+
+async function transcribeFile(file, model, key){
+  let decoded = null;
+  try{ decoded = await decodeToWav16k(file); }
+  catch(e){ decoded = null; }
+
+  if(decoded && decoded.seconds > 0){
+    const chunkSec = 360;
+    const total = decoded.samples.length;
+    const n = Math.max(1, Math.ceil(decoded.seconds / chunkSec));
+    const parts = [];
+    for(let i=0;i<n;i++){
+      const start = i*chunkSec*16000;
+      const end = Math.min(total, (i+1)*chunkSec*16000);
+      setStatus("التفريغ... الجزء "+(i+1)+" من "+n);
+      setProgress(i/n);
+      const wav = encodeWav16kPCM(decoded.samples.subarray(start, end));
+      const txt = await sendOpenRouter(bytesToBase64(wav), "wav", model, key, langCode());
+      parts.push((txt||"").trim());
+      setProgress((i+1)/n);
+    }
+    return parts.filter(Boolean).join("\n\n");
+  }
+
+  setStatus("تحويل تلقائي غير ممكن، إرسال الملف الأصلي...");
+  const b64 = await fileToBase64(file);
+  return sendOpenRouter(b64, guessFormat(file), model, key, langCode());
+}
+
+function langCode(){
+  return $("lang").value === "ar" ? "ar" : "";
+}
+
+async function sendOpenRouter(b64, format, model, key, language){
+  const body = {
+    model: model,
+    input_audio: { data: b64, format: format }
+  };
+  if(language) body.language = language;
+  const res = await fetch("https://openrouter.ai/api/v1/audio/transcriptions", {
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization":"Bearer "+key,
+      "X-Title":"تفريغ صوتي"
+    },
+    body: JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error("OpenRouter: "+await extractError(res));
+  const j = await res.json();
+  return (j.text || "").trim();
+}
+
+async function extractError(res){
+  try{
+    const j = await res.json();
+    return j.error && j.error.message ? j.error.message : JSON.stringify(j).slice(0,200);
+  }catch(e){
+    return (await res.text()).slice(0,200);
+  }
+}
+
+async function decodeToWav16k(file){
+  const buf = await file.arrayBuffer();
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx({ sampleRate:16000 });
+  try{
+    const ab = await ctx.decodeAudioData(buf);
+    const ch = ab.numberOfChannels;
+    const len = ab.length;
+    let mono;
+    if(ch === 1){
+      mono = new Float32Array(ab.getChannelData(0));
+    }else{
+      mono = new Float32Array(len);
+      for(let c=0;c<ch;c++){
+        const cd = ab.getChannelData(c);
+        for(let i=0;i<len;i++) mono[i] += cd[i];
+      }
+      for(let i=0;i<len;i++) mono[i] /= ch;
+    }
+    const samples = Math.abs(ab.sampleRate - 16000) < 1 ? mono : resample(mono, ab.sampleRate, 16000);
+    return { samples, seconds: samples.length/16000 };
+  }finally{
+    try{ ctx.close(); }catch(e){}
+  }
+}
+
+function resample(input, fromRate, toRate){
+  const n = Math.max(1, Math.round(input.length * toRate / fromRate));
+  const out = new Float32Array(n);
+  const ratio = input.length / n;
+  for(let i=0;i<n;i++){
+    const pos = i*ratio;
+    const i0 = Math.floor(pos);
+    const i1 = Math.min(i0+1, input.length-1);
+    const frac = pos - i0;
+    out[i] = input[i0] + (input[i1]-input[i0])*frac;
+  }
+  return out;
+}
+
+function encodeWav16kPCM(samples){
+  const n = samples.length;
+  const buf = new ArrayBuffer(44 + n*2);
+  const dv = new DataView(buf);
+  const w = (o,s)=>{ for(let i=0;i<s.length;i++) dv.setUint8(o+i, s.charCodeAt(i)); };
+  w(0,"RIFF"); dv.setUint32(4, 36+n*2, true); w(8,"WAVE");
+  w(12,"fmt "); dv.setUint32(16,16,true); dv.setUint16(20,1,true);
+  dv.setUint16(22,1,true); dv.setUint32(24,16000,true);
+  dv.setUint32(28,16000*2,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true);
+  w(36,"data"); dv.setUint32(40,n*2,true);
+  let o=44;
+  for(let i=0;i<n;i++,o+=2){
+    let s = samples[i];
+    if(s>1) s=1; else if(s<-1) s=-1;
+    dv.setInt16(o, s<0 ? s*0x8000 : s*0x7FFF, true);
+  }
+  return new Uint8Array(buf);
+}
+
+function bytesToBase64(bytes){
+  let bin = "";
+  const CHUNK = 0x8000;
+  for(let i=0;i<bytes.length;i+=CHUNK){
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i+CHUNK));
+  }
+  return btoa(bin);
+}
+
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const r = new FileReader();
+    r.onload = ()=> resolve(String(r.result).split(",")[1]);
+    r.onerror = ()=> reject(new Error("تعذّرت قراءة الملف"));
+    r.readAsDataURL(file);
+  });
+}
+
+function guessFormat(f){
+  const name = (f.name||"").toLowerCase();
+  const map = {
+    ".mp3":"mp3", ".m4a":"m4a", ".aac":"aac", ".mp4":"m4a", ".m4v":"m4a",
+    ".wav":"wav", ".ogg":"ogg", ".opus":"ogg", ".webm":"webm",
+    ".flac":"flac", ".caf":"m4a", ".mpeg":"mp3", ".mpga":"mp3"
+  };
+  for(const k in map){ if(name.endsWith(k)) return map[k]; }
+  return f.type && f.type.indexOf("ogg")>=0 ? "ogg" : "m4a";
+}
+
+function pickRecMime(){
+  const candidates = ["audio/mp4","audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus","audio/mpeg"];
+  if(typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported){
+    for(const c of candidates){ if(MediaRecorder.isTypeSupported(c)) return c; }
+  }
+  return "";
+}
+
+let mediaRec=null, recChunks=[], recStream=null;
+
+async function toggleRec(){
+  if(mediaRec && mediaRec.state !== "inactive"){ mediaRec.stop(); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    flash("المتصفح لا يدعم التسجيل بالمايك"); return;
+  }
+  try{
+    recStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    const mime = pickRecMime();
+    mediaRec = mime ? new MediaRecorder(recStream, { mimeType:mime }) : new MediaRecorder(recStream);
+    recChunks = [];
+    mediaRec.ondataavailable = e => { if(e.data && e.data.size) recChunks.push(e.data); };
+    mediaRec.onstop = () => {
+      try{ recStream.getTracks().forEach(t=>t.stop()); }catch(e){}
+      const type = mediaRec.mimeType || "audio/webm";
+      const blob = new Blob(recChunks, { type:type });
+      const ext = type.indexOf("mp4")>=0 ? "m4a" : "webm";
+      const f = new File([blob], "تسجيل."+ext, { type:type });
+      setFile(f);
+      runTranscribe();
+    };
+    mediaRec.start();
+    setRecButton(true);
+  }catch(e){
+    flash("تعذّر الوصول للمايك: "+e.message);
+  }
+}
+
+function setRecButton(recording){
+  recBtn.textContent = recording ? "إيقاف التسجيل" : "تسجيل بالمايك مباشرة";
+  recBtn.dataset.rec = recording ? "1" : "0";
+  recBtn.classList.toggle("primary", recording);
+}
+
+function copyResult(){
+  const text = resultBox.textContent;
+  if(!text) return;
+  const done = ()=>{ setStatus("تم نسخ النص ✔", true); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text, done));
+  }else{
+    fallbackCopy(text, done);
+  }
+}
+function fallbackCopy(text, done){
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); done(); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+function downloadResult(){
+  const text = resultBox.textContent;
+  if(!text) return;
+  const blob = new Blob([text], { type:"text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "تفريغ_صوتي_"+new Date().toISOString().slice(0,19).replace(/[:T]/g,"-")+".txt";
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+function addHistory(name, model, text){
+  let h = [];
+  try{ h = JSON.parse(localStorage.getItem("history") || "[]"); }catch(e){}
+  h.unshift({ ts: Date.now(), name:name, model:model, text:text });
+  h = h.slice(0, 40);
+  localStorage.setItem("history", JSON.stringify(h));
+  renderHistory();
+}
+
+function shortModel(m){
+  return (m||"").split("/").pop();
+}
+
+function renderHistory(){
+  let h = [];
+  try{ h = JSON.parse(localStorage.getItem("history") || "[]"); }catch(e){}
+  if(!h.length){ cardHistory.hidden = true; return; }
+  cardHistory.hidden = false;
+  const list = $("historyList");
+  list.innerHTML = "";
+  h.forEach((item, idx)=>{
+    const d = new Date(item.ts);
+    const date = d.toLocaleString("ar", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+    const div = document.createElement("div");
+    div.className = "history-item";
+    div.innerHTML =
+      '<div class="meta"><span>'+escapeHtml(item.name)+'</span><span>'+escapeHtml(shortModel(item.model))+' · '+escapeHtml(date)+'</span></div>'+
+      '<div class="txt"></div>'+
+      '<div class="actions"><button class="small ghost" onclick="copyHistory('+idx+')">نسخ</button>'+
+      '<button class="small outline" onclick="downloadHistory('+idx+')">تنزيل</button>'+
+      '<button class="small outline" onclick="deleteHistory('+idx+')">حذف</button></div>';
+    div.querySelector(".txt").textContent = item.text;
+    list.appendChild(div);
+  });
+}
+
+function copyHistory(idx){
+  const h = JSON.parse(localStorage.getItem("history") || "[]");
+  const text = h[idx].text;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>setStatus("تم النسخ ✔", true)).catch(()=>fallbackCopy(text, ()=>setStatus("تم النسخ ✔", true)));
+  }else{
+    fallbackCopy(text, ()=>setStatus("تم النسخ ✔", true));
+  }
+}
+function downloadHistory(idx){
+  const h = JSON.parse(localStorage.getItem("history") || "[]");
+  const blob = new Blob([h[idx].text], { type:"text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "تفريغ_"+new Date(h[idx].ts).toISOString().slice(0,19).replace(/[:T]/g,"-")+".txt";
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function deleteHistory(idx){
+  const h = JSON.parse(localStorage.getItem("history") || "[]");
+  h.splice(idx, 1);
+  localStorage.setItem("history", JSON.stringify(h));
+  renderHistory();
+}
+
+loadSettings();
+renderHistory();
+</script>
+</body>
+</html>
