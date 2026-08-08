@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230f766e'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white'%3E%D8%AA%3C/text%3E%3C/svg%3E">
 <title>تفريغ صوتي — تحويل الصوت إلى نص عربي</title>
 <style>
@@ -211,11 +213,21 @@
       </ol>
     </details>
     <details>
+      <summary>المشاركة المباشرة من زر المشاركة (أندرويد / Chrome)</summary>
+      <ol>
+        <li>ثبّت التطبيق: من قائمة <b>⋮</b> في Chrome اضغط "تثبيت التطبيق" (أو "إضافة إلى الشاشة الرئيسية").</li>
+        <li>افتح أي تطبيق تسجيل (التسجيلات الصوتية، واتساب...) واختر التسجيل ثم زر المشاركة.</li>
+        <li>اختر "تفريغ" من قائمة التطبيقات — سيستقبل التطبيق الملف ويجهّزه للتفريغ مباشرة.</li>
+        <li>يعمل أيضاً في Chrome على الكمبيوتر (ويندوز) بعد تثبيت التطبيق.</li>
+      </ol>
+    </details>
+    <details>
       <summary>كيف أرفع تسجيلاً من "التسجيلات الصوتية" في الأيفون؟</summary>
+      <p class="hint">آيفون لا يدعم المشاركة المباشرة للتطبيقات من المتصفح — لهذا استخدم "حفظ في الملفات" مرة واحدة لكل تسجيل:</p>
       <ol>
         <li>افتح تطبيق التسجيلات الصوتية → اختر التسجيل → زر المشاركة.</li>
         <li>اختر "حفظ في الملفات" ثم "حفظ".</li>
-        <li>في التطبيق اضغط "رفع ملف صوتي" واختر الملف.</li>
+        <li>في التطبيق اضغط "رفع ملف صوتي" واختر الملف من ملفاتي.</li>
       </ol>
     </details>
     <details>
@@ -768,6 +780,40 @@ window.addEventListener("unhandledrejection", function(ev){
     progress.classList.add("show");
   }catch(_){}
 });
+
+const SHARE_CACHE = "tafregh-shared";
+
+async function pickUpSharedFile(){
+  try{
+    if(!window.caches) return;
+    const cache = await caches.open(SHARE_CACHE);
+    const resp = await cache.match("shared");
+    if(!resp) return;
+    const blob = await resp.blob();
+    if(!blob.size){ await cache.delete("shared"); return; }
+    const name = decodeURIComponent(resp.headers.get("X-File-Name") || "مشترك." + (blob.type && blob.type.indexOf("mp4") >= 0 ? "m4a" : "webm"));
+    const type = resp.headers.get("Content-Type") || "audio/webm";
+    let f;
+    try{ f = new File([blob], name, { type: type }); }
+    catch(e){ f = new NamedBlob([blob], { type: type }, name); }
+    await cache.delete("shared");
+    setFile(f);
+    setStatus("استلمنا الملف المشترك ✔", true);
+    const card = $("card-input");
+    if(card) card.scrollIntoView({ behavior:"smooth", block:"start" });
+  }catch(_){}
+}
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+  navigator.serviceWorker.addEventListener("message", function(ev){
+    if(ev.data && ev.data.type === "SHARED_FILE_READY") pickUpSharedFile();
+  });
+}
+
+setTimeout(pickUpSharedFile, 400);
 </script>
 </body>
 </html>
