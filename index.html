@@ -88,6 +88,7 @@
   }
   .actions{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
   .hint{font-size:.78rem; color:var(--muted); margin-top:8px}
+  .keyok{color:var(--ok); font-weight:600}
   a{color:var(--accent); word-break:break-all}
   details{margin-top:6px}
   details summary{cursor:pointer; font-weight:600; font-size:.9rem; color:var(--brand2)}
@@ -122,6 +123,7 @@
       <button class="ghost grow" onclick="saveKey()">حفظ المفتاح</button>
       <button class="outline" onclick="clearKey()">مسح</button>
     </div>
+    <p class="hint" id="keyStatus"></p>
     <p class="hint">احصل عليه من <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> — الاستخدام بالرصيد، والمفتاح يُحفظ على جهازك فقط.</p>
   </section>
 
@@ -289,10 +291,25 @@ function saveKey(){
   inp.value = "";
   inp.placeholder = "✔ تم الحفظ";
   setTimeout(()=>{ inp.placeholder = "sk-or-..."; }, 2000);
+  updateKeyStatus();
+  setStatus("تم حفظ المفتاح ✔", true);
 }
 function clearKey(){
   localStorage.removeItem(KEY);
+  updateKeyStatus();
   flash("تم مسح المفتاح");
+}
+function updateKeyStatus(){
+  const el = $("keyStatus");
+  if(!el) return;
+  const k = getKey();
+  if(k){
+    el.textContent = "✔ المفتاح محفوظ على هذا الجهاز (…"+k.slice(-4)+")";
+    el.className = "hint keyok";
+  }else{
+    el.textContent = "لا يوجد مفتاح محفوظ بعد";
+    el.className = "hint";
+  }
 }
 
 function loadSettings(){
@@ -362,6 +379,19 @@ function busy(on){
   recBtn.disabled = on;
 }
 
+class NamedBlob extends Blob {
+  constructor(parts, opts, name){
+    super(parts, opts);
+    this.name = name || "تسجيل.webm";
+  }
+}
+
+function fmtErr(e){
+  if(!e) return "خطأ غير معروف";
+  const st = (e.stack || "").split("\n").slice(0,2).join(" | ");
+  return (e.name || "خطأ") + ": " + (e.message || String(e)) + (st ? " — " + st : "");
+}
+
 function resetAll(){
   currentFile = null;
   fileInput.value = "";
@@ -401,7 +431,7 @@ async function runTranscribe(){
     setStatus("اكتمل التفريغ ✔", true);
     fileinfo.innerHTML = "<b>"+ escapeHtml(file.name) +"</b>";
   }catch(e){
-    setStatus("خطأ: "+e.message);
+    setStatus("خطأ: "+fmtErr(e));
   }finally{
     busy(false);
   }
@@ -445,35 +475,46 @@ async function sendOpenRouter(b64, format, model, key, language){
     input_audio: { data: b64, format: format }
   };
   if(language) body.language = language;
-  const res = await fetch("https://openrouter.ai/api/v1/audio/transcriptions", {
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "Authorization":"Bearer "+key,
-      "X-Title":"تفريغ صوتي"
-    },
-    body: JSON.stringify(body)
-  });
-  if(!res.ok) throw new Error("OpenRouter: "+await extractError(res));
-  const j = await res.json();
-  return (j.text || "").trim();
-}
-
-async function extractError(res){
+  let res;
   try{
-    const j = await res.json();
-    return j.error && j.error.message ? j.error.message : JSON.stringify(j).slice(0,200);
+    res = await fetch("https://openrouter.ai/api/v1/audio/transcriptions", {
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":"Bearer "+key,
+        "X-Title":"تفريغ صوتي"
+      },
+      body: JSON.stringify(body)
+    });
   }catch(e){
-    return (await res.text()).slice(0,200);
+    throw new Error("تعذّر الاتصال بـ OpenRouter (تحقق من الإنترنت): "+e.message);
   }
+  let j = null;
+  try{ j = await res.json(); }catch(e){}
+  if(!res.ok){
+    let msg = "";
+    if(j && j.error){
+      msg = (typeof j.error === "string") ? j.error : (j.error.message || JSON.stringify(j.error));
+    }else if(j){
+      msg = JSON.stringify(j).slice(0,200);
+    }else{
+      msg = (await res.text().catch(()=>"")).slice(0,200);
+    }
+    throw new Error("OpenRouter ("+res.status+"): "+(msg || "خطأ غير معروف"));
+  }
+  return String((j && j.text) || "").trim();
 }
 
 async function decodeToWav16k(file){
   const buf = await file.arrayBuffer();
+  if(!buf || buf.byteLength === 0) throw new Error("ملف فارغ");
   const Ctx = window.AudioContext || window.webkitAudioContext;
-  const ctx = new Ctx({ sampleRate:16000 });
+  if(!Ctx) throw new Error("المتصفح لا يدعم فك تشفير الصوت");
+  let ctx = null;
+  try{ ctx = new Ctx({ sampleRate:16000 }); }
+  catch(e){ ctx = new Ctx(); }
   try{
-    const ab = await ctx.decodeAudioData(buf);
+    const ab = await withTimeout(ctx.decodeAudioData(buf), 30000, "تعذّر فك تشفير الصوت (صيغة غير مدعومة)");
     const ch = ab.numberOfChannels;
     const len = ab.length;
     let mono;
@@ -490,8 +531,15 @@ async function decodeToWav16k(file){
     const samples = Math.abs(ab.sampleRate - 16000) < 1 ? mono : resample(mono, ab.sampleRate, 16000);
     return { samples, seconds: samples.length/16000 };
   }finally{
-    try{ ctx.close(); }catch(e){}
+    try{ if(ctx && ctx.state !== "closed") ctx.close(); }catch(e){}
   }
+}
+
+function withTimeout(p, ms, msg){
+  return new Promise((resolve, reject)=>{
+    const t = setTimeout(()=> reject(new Error(msg)), ms);
+    p.then(v=>{ clearTimeout(t); resolve(v); }, e=>{ clearTimeout(t); reject(e); });
+  });
 }
 
 function resample(input, fromRate, toRate){
@@ -578,13 +626,27 @@ async function toggleRec(){
     recChunks = [];
     mediaRec.ondataavailable = e => { if(e.data && e.data.size) recChunks.push(e.data); };
     mediaRec.onstop = () => {
-      try{ recStream.getTracks().forEach(t=>t.stop()); }catch(e){}
-      const type = mediaRec.mimeType || "audio/webm";
-      const blob = new Blob(recChunks, { type:type });
-      const ext = type.indexOf("mp4")>=0 ? "m4a" : "webm";
-      const f = new File([blob], "تسجيل."+ext, { type:type });
-      setFile(f);
-      runTranscribe();
+      try{
+        recStream.getTracks().forEach(t=>t.stop());
+        const type = mediaRec.mimeType || "audio/webm";
+        const blob = new Blob(recChunks, { type:type });
+        if(!blob.size){
+          setRecButton(false);
+          flash("التسجيل فارغ — حاول مرة أخرى");
+          return;
+        }
+        const ext = type.indexOf("mp4")>=0 ? "m4a" : "webm";
+        let f;
+        try{ f = new File([blob], "تسجيل."+ext, { type:type }); }
+        catch(e){
+          f = new NamedBlob([blob], { type:type }, "تسجيل."+ext);
+        }
+        setFile(f);
+        setTimeout(()=> runTranscribe(), 200);
+      }catch(e){
+        setRecButton(false);
+        setStatus("خطأ في إنهاء التسجيل: "+fmtErr(e));
+      }
     };
     mediaRec.start();
     setRecButton(true);
@@ -691,6 +753,21 @@ function deleteHistory(idx){
 
 loadSettings();
 renderHistory();
+updateKeyStatus();
+window.addEventListener("error", function(ev){
+  try{
+    statusEl.textContent = "خطأ غير متوقع: "+fmtErr(ev.error || { name:"Error", message:ev.message });
+    statusEl.className = "err";
+    progress.classList.add("show");
+  }catch(_){}
+});
+window.addEventListener("unhandledrejection", function(ev){
+  try{
+    statusEl.textContent = "خطأ غير متوقع: "+fmtErr(ev.reason);
+    statusEl.className = "err";
+    progress.classList.add("show");
+  }catch(_){}
+});
 </script>
 </body>
 </html>
