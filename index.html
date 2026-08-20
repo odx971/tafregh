@@ -243,7 +243,7 @@
       <ol>
         <li>استخدم نموذج gpt-4o-transcribe مع لغة "العربية".</li>
         <li>سجّل في مكان هادئ وبعيداً عن الضوضاء.</li>
-        <li>الملفات الطويلة تُقسَّم تلقائياً وتُدمج النتائج.</li>
+        <li>الملفات الطويلة (حتى أكثر من 100 ميجا) تُقسَّم تلقائياً إلى أجزاء وتُدمج النتائج.</li>
       </ol>
     </details>
     <details>
@@ -259,7 +259,7 @@
 </main>
 
 <footer>
-  الاستخدام بالرصيد عبر OpenRouter — المفتاح يُحفظ محلياً. للاستخدام على الجوال: اضغط "أضف إلى الشاشة الرئيسية".
+  الإصدار v2 — دعم التسجيلات الطويلة جداً (أكثر من 100 ميجا): تُقسَّم تلقائياً وتُدمج النتائج. الاستخدام بالرصيد عبر OpenRouter — المفتاح يُحفظ محلياً. للاستخدام على الجوال: اضغط "أضف إلى الشاشة الرئيسية".
 </footer>
 
 <script>
@@ -361,10 +361,8 @@ fileInput.addEventListener("change", ()=>{
 
 function setFile(f){
   currentFile = f;
-  const kb = (f.size/1024);
-  const size = kb > 1024 ? (kb/1024).toFixed(1)+" MB" : Math.round(kb)+" KB";
   fileinfo.hidden = false;
-  fileinfo.innerHTML = "<b>"+ escapeHtml(f.name) +"</b> — "+size;
+  fileinfo.innerHTML = "<b>"+ escapeHtml(f.name) +"</b> — "+fmtSize(f.size);
   if(recBtn.dataset.rec === "1") setRecButton(false);
 }
 
@@ -449,8 +447,18 @@ async function runTranscribe(){
   }
 }
 
+const MAX_SEND_BYTES = 25*1024*1024;
+
+function fmtSize(bytes){
+  const kb = bytes/1024;
+  return kb > 1024 ? (kb/1024).toFixed(1)+" MB" : Math.round(kb)+" KB";
+}
+
 async function transcribeFile(file, model, key){
   let decoded = null;
+  setStatus(file.size > 150*1024*1024
+    ? "جارٍ فك تشفير الصوت… ملف كبير جداً، قد يستغرق دقائق"
+    : "جارٍ فك تشفير الصوت… قد يستغرق دقيقة أو أكثر للملفات الكبيرة");
   try{ decoded = await decodeToWav16k(file); }
   catch(e){ decoded = null; }
 
@@ -470,6 +478,10 @@ async function transcribeFile(file, model, key){
       setProgress((i+1)/n);
     }
     return parts.filter(Boolean).join("\n\n");
+  }
+
+  if(file.size > MAX_SEND_BYTES){
+    throw new Error("تعذّر فك تشفير هذا الملف الكبير ("+fmtSize(file.size)+") لمعالجته على الجهاز. جرّب تحويله إلى mp3 أو m4a، أو قصّه إلى أجزاء أصغر، ثم أعد المحاولة.");
   }
 
   setStatus("تحويل تلقائي غير ممكن، إرسال الملف الأصلي...");
@@ -526,7 +538,8 @@ async function decodeToWav16k(file){
   try{ ctx = new Ctx({ sampleRate:16000 }); }
   catch(e){ ctx = new Ctx(); }
   try{
-    const ab = await withTimeout(ctx.decodeAudioData(buf), 30000, "تعذّر فك تشفير الصوت (صيغة غير مدعومة)");
+    const decodeMs = Math.max(30000, Math.round(file.size*1000/(1024*1024)));
+    const ab = await withTimeout(ctx.decodeAudioData(buf), decodeMs, "تعذّر فك تشفير الصوت (صيغة غير مدعومة أو ملف كبير جداً)");
     const ch = ab.numberOfChannels;
     const len = ab.length;
     let mono;

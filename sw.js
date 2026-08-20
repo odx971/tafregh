@@ -1,7 +1,7 @@
 "use strict";
 
 const SHARE_CACHE = "tafregh-shared";
-const PRECACHE = "tafregh-static-v1";
+const PRECACHE = "tafregh-static-v2";
 const PRECACHE_URLS = [
   "/tafregh/",
   "/tafregh/index.html",
